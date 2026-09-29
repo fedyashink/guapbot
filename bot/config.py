@@ -32,7 +32,7 @@ def _pool_size_env(name: str, default: int) -> int:
     return max(1, value)
 
 
-BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
+BOT_TOKEN: str = os.getenv("BOT_TOKEN", "").strip()
 DATABASE_URL: str = os.getenv("DATABASE_URL", "").strip()
 DEFAULT_TZ: str = os.getenv("DEFAULT_TZ", "Europe/Moscow")
 DEFAULT_DEADLINE_TIME: str = os.getenv("DEFAULT_DEADLINE_TIME", "23:59")

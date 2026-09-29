@@ -34,9 +34,12 @@ async def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    if not BOT_TOKEN:
+    if not BOT_TOKEN.strip():
         raise SystemExit(
-            "BOT_TOKEN не задан. Скопируй .env.example в .env и вставь токен от @BotFather"
+            "BOT_TOKEN не задан. Локально — впиши его в файл .env рядом с README. "
+            "На Railway/Render — добавь переменную BOT_TOKEN в Variables у этого сервиса "
+            "и нажми Redeploy. Проверить: у переменной должно быть значение, "
+            "а не пустое поле."
         )
 
     await init_db()
