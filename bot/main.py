@@ -9,7 +9,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.config import BOT_TOKEN
-from bot.db import close_db, init_db, session_factory
+from bot.db import close_db, describe_backend, init_db, session_factory
 from bot.handlers import assignments, settings, start, stats
 from bot.middlewares import DbSessionMiddleware, UserMiddleware
 from bot.scheduler import start_scheduler
@@ -40,6 +40,7 @@ async def main() -> None:
         )
 
     await init_db()
+    log.info("БД: %s", describe_backend())
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = build_dispatcher()
     scheduler = start_scheduler(bot, session_factory)

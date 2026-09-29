@@ -1,6 +1,7 @@
 aiogram>=3.13
 SQLAlchemy[asyncio]>=2.0
 aiosqlite>=0.20
+asyncpg>=0.29
 greenlet>=3.0
 APScheduler>=3.10,<4
 python-dotenv>=1.0

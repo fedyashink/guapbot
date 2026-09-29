@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, BigInteger, Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, BigInteger, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from bot.config import DEFAULT_REMINDER_OFFSETS
 from bot.utils.time import utcnow
+
+PK = Integer().with_variant(BigInteger, "postgresql")
 
 
 class Base(DeclarativeBase):
@@ -16,7 +18,7 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(PK, primary_key=True)
     tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     timezone: Mapped[str] = mapped_column(String(64), default="Europe/Moscow")
@@ -36,7 +38,7 @@ class User(Base):
 class Assignment(Base):
     __tablename__ = "assignments"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(PK, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(120))
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

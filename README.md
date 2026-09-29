@@ -37,22 +37,69 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env      # вставь токен от @BotFather
+cp .env.example .env      # вставить токен от @BotFather
 python -m bot
 ```
 
-База данных (SQLite) создаётся автоматически в `data/bot.db`.
+`DATABASE_URL` можно не задавать — тогда бот работает на SQLite в `data/bot.db`.
+
+## Деплой: Railway + Neon Postgres
+
+Файловая система на Railway **эфемерная** — SQLite с дедлайнами стирается при
+каждом редеплое. Поэтому в проде нужна внешняя БД.
+
+**1. Создай базу в Neon** (бесплатно, без карты, 0.5 GB):
+https://console.neon.tech → Create a project → **Connection string** → скопируй строку
+вида `postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require`
+
+**2. Задеплой на Railway**:
+https://railway.com/new → **Deploy from GitHub repo** → выбери свой репозиторий.
+Railway сам соберёт `Dockerfile` из корня.
+
+**3. Задай переменные** (Variables → Raw editor):
+
+| Переменная | Значение |
+|---|---|
+| `BOT_TOKEN` | токен от @BotFather |
+| `DATABASE_URL` | строка подключения Neon из шага 1 |
+| `DEFAULT_TZ` | `Europe/Moscow` |
+
+Таблицы создаются автоматически при первом старте.
+
+**4. Проверь логи** — должна быть строка:
+```
+БД: postgresql+asyncpg://ep-xxx.aws.neon.tech/neondb
+Бот запущен
+```
+
+### Нюансы, которые уже обработаны в коде
+
+- `postgresql://` автоматически превращается в `postgresql+asyncpg://` — синхронные
+  драйверы (`psycopg2`, `psycopg`) не нужны и не ставятся
+- `?sslmode=require` из Neon-строки убирается и превращается в `ssl=True` для asyncpg
+  (параметр `sslmode` в `asyncpg.connect()` не существует и вызвал бы `TypeError`)
+- `pooler=transaction`, `pgbouncer` и `channel_binding` тоже вырезаются — asyncpg их не понимает
+- на Neon **pooled** endpoint (хост с `-pooler`) автоматически ставится
+  `statement_cache_size=0`, иначе PgBouncer ругается на `prepared statement already exists`
+- `build_engine()` сам приводит схему к `postgresql+asyncpg`, даже если в переменной
+  окружения она записана как `postgresql://` или `postgres://`
+- `pool_pre_ping=True` переживает разрывы соединений
+- `init_db()` делает 5 попыток с backoff: Neon после паузы засыпает (scale-to-zero)
+  и первое соединение может не пройти
+- пароль из `DATABASE_URL` не попадает в логи (`describe_backend`)
 
 ## Настройки (.env)
 
 | Переменная | По умолчанию | Смысл |
 |---|---|---|
 | `BOT_TOKEN` | — | токен от @BotFather, обязателен |
+| `DATABASE_URL` | — | Postgres; пусто = SQLite |
 | `DEFAULT_TZ` | `Europe/Moscow` | пояс для новых пользователей |
 | `DEFAULT_REMINDER_OFFSETS` | `24,6,1` | напоминания за N часов |
 | `DEFAULT_DEADLINE_TIME` | `23:59` | время, если не указано |
 | `DIGEST_HOUR` | `9` | час утренней сводки |
-| `DB_PATH` | `data/bot.db` | путь к базе |
+| `DB_POOL_SIZE` | `5` | размер пула соединений |
+| `DB_PATH` | `data/bot.db` | путь к файлу SQLite |
 
 ## Тесты
 
@@ -60,8 +107,8 @@ python -m bot
 pytest -q
 ```
 
-Покрыты парсер дат, сервисный слой, статистика, хендлеры (через фейковую Telegram-сессию)
-и планировщик напоминаний.
+Покрыты парсер дат, сервисный слой, статистика, хендлеры (через фейковую Telegram-сессию),
+планировщик напоминаний и логика подключения к БД (в т.ч. несовместимые параметры Neon).
 
 ## Архитектура
 
@@ -69,7 +116,7 @@ pytest -q
 bot/
   main.py          точка входа, диспетчер, middlewares
   config.py        конфиг из .env
-  db.py            async-движок и фабрика сессий
+  db.py            движок: SQLite или Postgres по DATABASE_URL
   models.py        User, Assignment (SQLAlchemy 2.0)
   scheduler.py     APScheduler: напоминания + дайджест
   keyboards.py     инлайн-клавиатуры
@@ -80,7 +127,8 @@ bot/
   utils/           парсер дат, форматирование, работа со временем
 ```
 
-Время в БД хранится в UTC, пользователю показывается в его часовом поясе.
-Планировщик ходит по базе раз в 30 секунд, поэтому перезапуски бота не приводят
-к потере напоминаний, а отметки о отправленном хранятся в `reminded_offsets`.
+Одна кодовая база работает и на SQLite (локально), и на Postgres (прод) — разница
+только в `DATABASE_URL`. Время в БД хранится в UTC, пользователю показывается в его
+часовом поясе. Планировщик ходит по базе раз в 30 секунд, поэтому перезапуски бота
+не приводят к потере напоминаний, а отметки об отправке хранятся в `reminded_offsets`.
 # guapbot

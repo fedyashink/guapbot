@@ -8,6 +8,7 @@ from aiogram.exceptions import TelegramForbiddenError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from bot.config import DEFAULT_REMINDER_OFFSETS
@@ -58,7 +59,11 @@ async def tick(bot: Bot, session_factory: async_sessionmaker) -> None:
     async with session_factory() as session:
         users = list(await session.scalars(select(User)))
         for user in users:
-            await _process_user(bot, session, user, now)
+            try:
+                await _process_user(bot, session, user, now)
+            except SQLAlchemyError:
+                log.exception("tick failed for user %s", user.tg_id)
+                await session.rollback()
         await session.commit()
 
 
